@@ -11,6 +11,8 @@ from PyQt6.QtGui import QAction, QKeyEvent
 from time import time
 from finsolver.config import FinConfig, FinLayerData
 from finsolver.units import convert_to_si, convert_from_si
+from finsolver.visual import FinCrossSectionView
+
 
 from PyQt6.QtWidgets import QFileDialog
 import json
@@ -28,6 +30,7 @@ class FinSolverMainWindow(QMainWindow):
         self.config = FinConfig()
         self.init_ui()
         self.current_file = None
+
 
 
     def init_menu(self):
@@ -72,6 +75,7 @@ class FinSolverMainWindow(QMainWindow):
         main_widget = QWidget()
         main_layout = QHBoxLayout()
 
+        # --- Navigation ---
         self.nav_list = QListWidget()
         self.general_item = QListWidgetItem("General Settings")
         self.core_item = QListWidgetItem("Core Layer")
@@ -84,6 +88,7 @@ class FinSolverMainWindow(QMainWindow):
         self.nav_list.viewport().installEventFilter(self)
         self.nav_list.installEventFilter(self)
 
+        # --- Editor Panel ---
         self.editor_panel = QVBoxLayout()
         self.editor_form = QFormLayout()
         self.editor_widget = QWidget()
@@ -106,16 +111,16 @@ class FinSolverMainWindow(QMainWindow):
         left_widget = QWidget()
         left_widget.setLayout(left_side)
 
-        self.visual_label = QLabel("[Layup Visualization Placeholder]")
-        self.visual_label.setFrameShape(QFrame.Shape.Box)
-        self.visual_label.setMinimumHeight(300)
-        self.visual_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        # --- Visualization View ---
+        self.visual_view = FinCrossSectionView(self.config)
+        self.visual_view.setMinimumHeight(300)
 
         visual_widget = QWidget()
         visual_layout = QVBoxLayout()
-        visual_layout.addWidget(self.visual_label)
+        visual_layout.addWidget(self.visual_view)
         visual_widget.setLayout(visual_layout)
 
+        # --- Combine Panels ---
         main_layout.addWidget(left_widget, 2)
         main_layout.addWidget(visual_widget, 2)
 
@@ -123,6 +128,8 @@ class FinSolverMainWindow(QMainWindow):
         self.setCentralWidget(main_widget)
 
         self.display_editor(self.nav_list.currentItem())
+
+
 
     def new_config(self):
         self.config = FinConfig()
@@ -282,8 +289,8 @@ class FinSolverMainWindow(QMainWindow):
             self.editor_form.addRow("Poisson's Ratio:", QLineEdit(str(core.poisson_ratio)))
 
             self.delete_button.hide()
-
-
+            
+            
 
         elif name.startswith("Layer"): 
             index = self.get_layer_index(name)
@@ -360,6 +367,20 @@ class FinSolverMainWindow(QMainWindow):
 
         else:
             self.delete_button.hide()
+
+
+        # Set the selected layer index for visual highlighting
+        if name == "Core Layer":
+            self.visual_view.set_selected_layer(0)
+        elif name.startswith("Layer"):
+            index = self.get_layer_index(name)
+            if index is not None:
+                self.visual_view.set_selected_layer(index + 1)  # +1 because core = 0
+        else:
+            self.visual_view.set_selected_layer(-1)  # Deselect all
+
+        self.visual_view.update()
+
 
     def get_layer_index(self, name):
         try:
