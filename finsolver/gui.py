@@ -19,30 +19,47 @@ class FinSolverMainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.config = FinConfig()
-        self.setWindowTitle("FinSolver – Fin Flutter Analysis")
+        self.setWindowTitle("FinSolver -Fin Flutter Analysis")
         self.setGeometry(100, 100, 1000, 600)
         self.last_delete_time = 0
         self.user_clicked_add = False
         self.config = FinConfig()
         self.init_ui()
+        self.current_file = None
+
 
     def init_menu(self):
         menubar = self.menuBar()
         file_menu = menubar.addMenu("File")
 
-        import_action = QAction("Import Config (.fs)", self)
-        import_action.triggered.connect(self.import_config)
-        file_menu.addAction(import_action)
+        # --- File operations ---
+        new_action = QAction("New", self)
+        new_action.triggered.connect(self.new_config)
+        file_menu.addAction(new_action)
 
-        export_action = QAction("Export Config (.fs)", self)
+        open_action = QAction("Open", self)
+        open_action.triggered.connect(self.import_config)
+        file_menu.addAction(open_action)
+
+        save_action = QAction("Save", self)
+        save_action.triggered.connect(self.save_config)
+        file_menu.addAction(save_action)
+
+        save_as_action = QAction("Save As", self)
+        save_as_action.triggered.connect(self.save_config_as)
+        file_menu.addAction(save_as_action)
+
+        export_action = QAction("Export (.fs)", self)
         export_action.triggered.connect(self.export_config)
         file_menu.addAction(export_action)
 
+        # --- Other menus ---
         menubar.addMenu("Properties")
         run_menu = menubar.addMenu("Run")
         run_action = QAction("Run Simulation", self)
         run_action.triggered.connect(self.run_simulation)
         run_menu.addAction(run_action)
+
 
 
 
@@ -105,6 +122,35 @@ class FinSolverMainWindow(QMainWindow):
 
         self.display_editor(self.nav_list.currentItem())
 
+    def new_config(self):
+        self.config = FinConfig()
+        self.refresh_gui_from_config()
+        self.current_file = None
+
+    def save_config(self):
+        if hasattr(self, "current_file") and self.current_file:
+            with open(self.current_file, "w") as f:
+                json.dump(self.config.to_dict(), f, indent=2)
+        else:
+            self.save_config_as()
+
+    def save_config_as(self):
+        file_path, _ = QFileDialog.getSaveFileName(self, "Save As", "", "FinSolver Files (*.fs)")
+        if file_path:
+            if not file_path.endswith(".fs"):
+                file_path += ".fs"
+            self.current_file = file_path
+            self.save_config()
+
+    def import_config(self):
+        file_path, _ = QFileDialog.getOpenFileName(self, "Open", "", "FinSolver Files (*.fs)")
+        if file_path and os.path.exists(file_path):
+            with open(file_path, "r") as f:
+                data = json.load(f)
+                self.config = FinConfig.from_dict(data)
+            self.current_file = file_path
+            self.refresh_gui_from_config()
+
     def export_config(self):
         file_path, _ = QFileDialog.getSaveFileName(self, "Export Config", "", "FinSolver Files (*.fs)")
         if file_path:
@@ -113,13 +159,6 @@ class FinSolverMainWindow(QMainWindow):
             with open(file_path, "w") as f:
                 json.dump(self.config.to_dict(), f, indent=2)
 
-    def import_config(self):
-        file_path, _ = QFileDialog.getOpenFileName(self, "Import Config", "", "FinSolver Files (*.fs)")
-        if file_path and os.path.exists(file_path):
-            with open(file_path, "r") as f:
-                data = json.load(f)
-                self.config = FinConfig.from_dict(data)
-            self.refresh_gui_from_config()
 
 
     def refresh_gui_from_config(self):
