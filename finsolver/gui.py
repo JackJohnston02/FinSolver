@@ -7,6 +7,8 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QAction, QKeyEvent
 from time import time
+from finsolver.config import FinConfig, FinLayerData
+from finsolver.units import convert_to_si
 
 
 class FinSolverMainWindow(QMainWindow):
@@ -16,8 +18,7 @@ class FinSolverMainWindow(QMainWindow):
         self.setWindowTitle("FinSolver – Fin Flutter Analysis")
         self.setGeometry(100, 100, 1000, 600)
         self.user_clicked_add = False
-        self.layers = []  # Store data for each layer
-        self.deletion_lock = False
+        self.config = FinConfig()
         self.init_ui()
 
     def init_ui(self):
@@ -60,7 +61,6 @@ class FinSolverMainWindow(QMainWindow):
         left_widget = QWidget()
         left_widget.setLayout(left_side)
 
-        # Visualization Panel
         self.visual_label = QLabel("[Layup Visualization Placeholder]")
         self.visual_label.setFrameShape(QFrame.Shape.Box)
         self.visual_label.setMinimumHeight(300)
@@ -87,7 +87,7 @@ class FinSolverMainWindow(QMainWindow):
         elif source == self.nav_list and isinstance(event, QKeyEvent):
             if event.key() == Qt.Key.Key_Delete:
                 now = time()
-                if now - self.last_delete_time > 0.3:  # 300ms lockout
+                if now - self.last_delete_time > 0.3:
                     self.last_delete_time = now
                     self.delete_selected_layer()
                 return True
@@ -102,25 +102,31 @@ class FinSolverMainWindow(QMainWindow):
         run_action.triggered.connect(self.run_simulation)
         run_menu.addAction(run_action)
 
-    def make_input_with_units(self, default_value, units_list, selected_unit):
+    def make_input_with_units(self, value, units_list, default_unit, setter):
         container = QWidget()
         layout = QHBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
 
-        input_field = QLineEdit(default_value)
+        input_field = QLineEdit(str(value))
         unit_box = QComboBox()
         unit_box.addItems(units_list)
-        unit_box.setCurrentText(selected_unit)
+        unit_box.setCurrentText(default_unit)
 
-        unit_box.activated.connect(lambda _: unit_box.hidePopup())  # Direct and clean
+        def on_change():
+            try:
+                val = float(input_field.text())
+                si_val = convert_to_si(val, unit_box.currentText())
+                setter(si_val)
+            except ValueError:
+                pass
+
+        input_field.editingFinished.connect(on_change)
+        unit_box.activated.connect(lambda _: on_change())
 
         layout.addWidget(input_field)
         layout.addWidget(unit_box)
         container.setLayout(layout)
-
         return container
-
-
 
     def display_editor(self, current, previous=None):
         if not current:
@@ -139,29 +145,31 @@ class FinSolverMainWindow(QMainWindow):
             self.editor_form.removeRow(0)
 
         if name == "General Settings":
-            self.editor_form.addRow("Body Tube OD:", self.make_input_with_units("80", ["mm", "cm", "in", "m"], "mm"))
-            self.editor_form.addRow("Number of Fins:", QLineEdit("4"))
+            self.editor_form.addRow("Body Tube OD:", self.make_input_with_units(
+                self.config.body_tube_od, ["mm", "cm", "in", "m"], "mm", lambda val: setattr(self.config, "body_tube_od", val)))
+            self.editor_form.addRow("Number of Fins:", QLineEdit(str(self.config.num_fins)))
             self.delete_button.hide()
 
         elif name == "Core Layer":
-            self.editor_form.addRow("Material:", QLineEdit("Carbon Fiber"))
-            self.editor_form.addRow("Young's Modulus:", self.make_input_with_units("70", ["GPa", "MPa"], "GPa"))
-            self.editor_form.addRow("Shear Modulus:", self.make_input_with_units("5", ["GPa", "MPa"], "GPa"))
-            self.editor_form.addRow("Thickness:", self.make_input_with_units("3", ["mm", "cm", "in", "m"], "mm"))
-            self.editor_form.addRow("Root Chord:", self.make_input_with_units("200", ["mm", "cm", "in", "m"], "mm"))
-            self.editor_form.addRow("Tip Chord:", self.make_input_with_units("60", ["mm", "cm", "in", "m"], "mm"))
+            core = self.config.core
+            self.editor_form.addRow("Material:", QLineEdit(core.material))
+            self.editor_form.addRow("Young's Modulus:", self.make_input_with_units(core.E, ["GPa", "MPa"], "GPa", lambda val: setattr(core, "E", val)))
+            self.editor_form.addRow("Shear Modulus:", self.make_input_with_units(core.G, ["GPa", "MPa"], "GPa", lambda val: setattr(core, "G", val)))
+            self.editor_form.addRow("Thickness:", self.make_input_with_units(core.thickness, ["mm", "cm", "in", "m"], "mm", lambda val: setattr(core, "thickness", val)))
+            self.editor_form.addRow("Root Chord:", self.make_input_with_units(core.root_chord, ["mm", "cm", "in", "m"], "mm", lambda val: setattr(core, "root_chord", val)))
+            self.editor_form.addRow("Tip Chord:", self.make_input_with_units(core.tip_chord, ["mm", "cm", "in", "m"], "mm", lambda val: setattr(core, "tip_chord", val)))
             self.delete_button.hide()
 
         elif name.startswith("Layer"):
             index = self.get_layer_index(name)
-            if index is not None and 0 <= index < len(self.layers):
-                layer = self.layers[index]
-                self.editor_form.addRow("Material:", QLineEdit(layer.get("material", "")))
-                self.editor_form.addRow("Young's Modulus:", self.make_input_with_units(str(layer.get("E", "")), ["GPa", "MPa"], "GPa"))
-                self.editor_form.addRow("Shear Modulus:", self.make_input_with_units(str(layer.get("G", "")), ["GPa", "MPa"], "GPa"))
-                self.editor_form.addRow("Thickness:", self.make_input_with_units(str(layer.get("thickness", "")), ["mm", "cm", "in", "m"], "mm"))
-                self.editor_form.addRow("Root Chord:", self.make_input_with_units(str(layer.get("root_chord", "")), ["mm", "cm", "in", "m"], "mm"))
-                self.editor_form.addRow("Tip Chord:", self.make_input_with_units(str(layer.get("tip_chord", "")), ["mm", "cm", "in", "m"], "mm"))
+            if index is not None and 0 <= index < len(self.config.layers):
+                layer = self.config.layers[index]
+                self.editor_form.addRow("Material:", QLineEdit(layer.material))
+                self.editor_form.addRow("Young's Modulus:", self.make_input_with_units(layer.E, ["GPa", "MPa"], "GPa", lambda val: setattr(layer, "E", val)))
+                self.editor_form.addRow("Shear Modulus:", self.make_input_with_units(layer.G, ["GPa", "MPa"], "GPa", lambda val: setattr(layer, "G", val)))
+                self.editor_form.addRow("Thickness:", self.make_input_with_units(layer.thickness, ["mm", "cm", "in", "m"], "mm", lambda val: setattr(layer, "thickness", val)))
+                self.editor_form.addRow("Root Chord:", self.make_input_with_units(layer.root_chord, ["mm", "cm", "in", "m"], "mm", lambda val: setattr(layer, "root_chord", val)))
+                self.editor_form.addRow("Tip Chord:", self.make_input_with_units(layer.tip_chord, ["mm", "cm", "in", "m"], "mm", lambda val: setattr(layer, "tip_chord", val)))
             self.delete_button.show()
         else:
             self.delete_button.hide()
@@ -173,16 +181,8 @@ class FinSolverMainWindow(QMainWindow):
             return None
 
     def add_new_layer(self):
-        new_layer = {
-            "material": "Carbon Fiber",
-            "E": 70,
-            "G": 5,
-            "thickness": 3,
-            "root_chord": 200,
-            "tip_chord": 60
-        }
-        self.layers.append(new_layer)
-        new_item = QListWidgetItem(f"Layer {len(self.layers)}")
+        self.config.layers.append(FinLayerData())
+        new_item = QListWidgetItem(f"Layer {len(self.config.layers)}")
         insert_index = self.nav_list.row(self.add_layer_item)
         self.nav_list.insertItem(insert_index, new_item)
         self.nav_list.setCurrentItem(new_item)
@@ -191,14 +191,14 @@ class FinSolverMainWindow(QMainWindow):
         current_item = self.nav_list.currentItem()
         if current_item and current_item.text().startswith("Layer"):
             index = self.get_layer_index(current_item.text())
-            if index is not None and 0 <= index < len(self.layers):
-                del self.layers[index]
+            if index is not None and 0 <= index < len(self.config.layers):
+                del self.config.layers[index]
                 self.nav_list.takeItem(self.nav_list.row(current_item))
                 self.renumber_layers()
 
                 def update_selection():
-                    if self.layers:
-                        self.nav_list.setCurrentRow(2 + min(index, len(self.layers) - 1))
+                    if self.config.layers:
+                        self.nav_list.setCurrentRow(2 + min(index, len(self.config.layers) - 1))
                     else:
                         self.nav_list.setCurrentItem(self.general_item)
 
