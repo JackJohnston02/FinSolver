@@ -5,15 +5,18 @@ from typing import List
 @dataclass
 class FinLayerData:
     material: str = "Carbon Fiber"
-    E: float = 70e9                # Young's Modulus, Pa
-    G: float = 5e9                 # Shear Modulus, Pa
-    thickness: float = 0.003       # meters
-    root_chord: float = 0.2        # meters
-    height: float = 0.1            # meters
-    sweep_length: float = 0.05     # meters
-    tip_chord: float = 0.06        # meters
-    density: float = 1600          # kg/m^3
-    poisson_ratio: float = 0.3     # dimensionless
+    E: float = 70e9
+    G: float = 5e9
+    thickness: float = 0.003
+    root_chord: float = 0.2
+    tip_chord: float = 0.06
+    height: float = 0.1
+    sweep_length: float = 0.05
+    density: float = 1600.0
+    poisson_ratio: float = 0.3
+    instep_enabled: bool = False
+    instep_value: float = 0.0
+
 
     def to_dict(self):
         return asdict(self)

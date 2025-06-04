@@ -2,8 +2,10 @@ import sys
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QLabel, QVBoxLayout, QHBoxLayout,
     QFormLayout, QLineEdit, QPushButton, QListWidget, QListWidgetItem,
-    QMenuBar, QMenu, QFrame, QMessageBox, QComboBox
+    QMenuBar, QMenu, QFrame, QMessageBox, QComboBox, QCheckBox
 )
+
+from PyQt6.QtWidgets import QCheckBox, QLineEdit, QHBoxLayout, QWidget
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QAction, QKeyEvent
 from time import time
@@ -283,26 +285,70 @@ class FinSolverMainWindow(QMainWindow):
 
 
 
-        elif name.startswith("Layer"):
+        elif name.startswith("Layer"): 
             index = self.get_layer_index(name)
             if index is not None and 0 <= index < len(self.config.layers):
                 layer = self.config.layers[index]
 
-                # Geometry subtitle
-                subtitle_geo = QLabel("Geometry:")
-                subtitle_geo.setStyleSheet("font-weight: bold; margin-top: 10px; margin-left: -4px;")
-                self.editor_form.addRow(subtitle_geo)
+                # --- Geometry Section Title ---
+                geo_title = QLabel("Geometry:")
+                geo_title.setStyleSheet("font-weight: bold; margin-top: 10px; margin-left: -4px;")
+                self.editor_form.addRow(geo_title)
 
-                self.editor_form.addRow("Root Chord:", self.make_input_with_units(layer.root_chord, ["mm", "cm", "in", "m"], "mm", lambda val: setattr(layer, "root_chord", val)))
-                self.editor_form.addRow("Tip Chord:", self.make_input_with_units(layer.tip_chord, ["mm", "cm", "in", "m"], "mm", lambda val: setattr(layer, "tip_chord", val)))
-                self.editor_form.addRow("Height:", self.make_input_with_units(layer.height, ["mm", "cm", "in", "m"], "mm", lambda val: setattr(layer, "height", val)))
-                self.editor_form.addRow("Sweep Length:", self.make_input_with_units(layer.sweep_length, ["mm", "cm", "in", "m"], "mm", lambda val: setattr(layer, "sweep_length", val)))
-                self.editor_form.addRow("Thickness:", self.make_input_with_units(layer.thickness, ["mm", "cm", "in", "m"], "mm", lambda val: setattr(layer, "thickness", val)))
+                # --- Instep Checkbox ---
+                instep_checkbox = QCheckBox("Instep from Previous Layer")
+                instep_checkbox.setChecked(layer.instep_enabled)
+                self.editor_form.addRow(instep_checkbox)
 
-                # Material subtitle
-                subtitle_mat = QLabel("Material Properties:")
-                subtitle_mat.setStyleSheet("font-weight: bold; margin-top: 10px; margin-left: -4px;")
-                self.editor_form.addRow(subtitle_mat)
+                # --- Instep Distance Field ---
+                instep_input = self.make_input_with_units(
+                    layer.instep_value,
+                    ["mm", "cm", "in", "m"],
+                    "mm",
+                    lambda val: setattr(layer, "instep_value", val)
+                )
+                self.editor_form.addRow("Instep Distance:", instep_input)
+
+                # --- Geometry Inputs ---
+                root_input = self.make_input_with_units(
+                    layer.root_chord, ["mm", "cm", "in", "m"], "mm", lambda val: setattr(layer, "root_chord", val)
+                )
+                tip_input = self.make_input_with_units(
+                    layer.tip_chord, ["mm", "cm", "in", "m"], "mm", lambda val: setattr(layer, "tip_chord", val)
+                )
+                height_input = self.make_input_with_units(
+                    layer.height, ["mm", "cm", "in", "m"], "mm", lambda val: setattr(layer, "height", val)
+                )
+                sweep_input = self.make_input_with_units(
+                    layer.sweep_length, ["mm", "cm", "in", "m"], "mm", lambda val: setattr(layer, "sweep_length", val)
+                )
+
+                geometry_inputs = [root_input, tip_input, height_input, sweep_input]
+
+                def update_instep_state(enabled: bool):
+                    print(f"[DEBUG] Instep checkbox toggled. Enabled: {enabled}")
+                    instep_input.setEnabled(enabled)
+                    for widget in geometry_inputs:
+                        widget.setDisabled(enabled)
+                    layer.instep_enabled = enabled
+
+                # Initial state
+                update_instep_state(layer.instep_enabled)
+
+                # React to checkbox changes
+                instep_checkbox.toggled.connect(lambda checked: update_instep_state(checked))
+
+
+                # Add geometry inputs
+                self.editor_form.addRow("Root Chord:", root_input)
+                self.editor_form.addRow("Tip Chord:", tip_input)
+                self.editor_form.addRow("Height:", height_input)
+                self.editor_form.addRow("Sweep Length:", sweep_input)
+
+                # --- Material Properties Title ---
+                mat_title = QLabel("Material Properties:")
+                mat_title.setStyleSheet("font-weight: bold; margin-top: 10px; margin-left: -4px;")
+                self.editor_form.addRow(mat_title)
 
                 self.editor_form.addRow("Material:", QLineEdit(layer.material))
                 self.editor_form.addRow("Young's Modulus:", self.make_input_with_units(layer.E, ["GPa", "MPa"], "GPa", lambda val: setattr(layer, "E", val)))
@@ -310,7 +356,7 @@ class FinSolverMainWindow(QMainWindow):
                 self.editor_form.addRow("Density:", self.make_input_with_units(layer.density, ["kg/m³"], "kg/m³", lambda val: setattr(layer, "density", val)))
                 self.editor_form.addRow("Poisson's Ratio:", QLineEdit(str(layer.poisson_ratio)))
 
-            self.delete_button.show()
+                self.delete_button.show()
 
         else:
             self.delete_button.hide()
