@@ -219,8 +219,10 @@ class FinSolverMainWindow(QMainWindow):
                 val = float(input_field.text())
                 si_val = convert_to_si(val, unit_box.currentText())
                 setter(si_val)
+                self.visual_view.update()  # Trigger visual refresh
             except ValueError:
                 pass
+
 
         def on_unit_change():
             try:
