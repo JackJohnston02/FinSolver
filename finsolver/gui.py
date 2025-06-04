@@ -8,18 +8,44 @@ from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QAction, QKeyEvent
 from time import time
 from finsolver.config import FinConfig, FinLayerData
-from finsolver.units import convert_to_si
+from finsolver.units import convert_to_si, convert_from_si
+
+from PyQt6.QtWidgets import QFileDialog
+import json
+import os
 
 
 class FinSolverMainWindow(QMainWindow):
     def __init__(self):
-        self.last_delete_time = 0
         super().__init__()
+        self.config = FinConfig()
         self.setWindowTitle("FinSolver – Fin Flutter Analysis")
         self.setGeometry(100, 100, 1000, 600)
+        self.last_delete_time = 0
         self.user_clicked_add = False
         self.config = FinConfig()
         self.init_ui()
+
+    def init_menu(self):
+        menubar = self.menuBar()
+        file_menu = menubar.addMenu("File")
+
+        import_action = QAction("Import Config (.fs)", self)
+        import_action.triggered.connect(self.import_config)
+        file_menu.addAction(import_action)
+
+        export_action = QAction("Export Config (.fs)", self)
+        export_action.triggered.connect(self.export_config)
+        file_menu.addAction(export_action)
+
+        menubar.addMenu("Properties")
+        run_menu = menubar.addMenu("Run")
+        run_action = QAction("Run Simulation", self)
+        run_action.triggered.connect(self.run_simulation)
+        run_menu.addAction(run_action)
+
+
+
 
     def init_ui(self):
         self.init_menu()
@@ -79,6 +105,38 @@ class FinSolverMainWindow(QMainWindow):
 
         self.display_editor(self.nav_list.currentItem())
 
+    def export_config(self):
+        file_path, _ = QFileDialog.getSaveFileName(self, "Export Config", "", "FinSolver Files (*.fs)")
+        if file_path:
+            if not file_path.endswith(".fs"):
+                file_path += ".fs"
+            with open(file_path, "w") as f:
+                json.dump(self.config.to_dict(), f, indent=2)
+
+    def import_config(self):
+        file_path, _ = QFileDialog.getOpenFileName(self, "Import Config", "", "FinSolver Files (*.fs)")
+        if file_path and os.path.exists(file_path):
+            with open(file_path, "r") as f:
+                data = json.load(f)
+                self.config = FinConfig.from_dict(data)
+            self.refresh_gui_from_config()
+
+
+    def refresh_gui_from_config(self):
+        # Clear all user-defined layers
+        for i in reversed(range(self.nav_list.count())):
+            item = self.nav_list.item(i)
+            if item.text().startswith("Layer"):
+                self.nav_list.takeItem(i)
+
+        # Recreate layer items
+        for i in range(len(self.config.layers)):
+            self.nav_list.insertItem(self.nav_list.row(self.add_layer_item), QListWidgetItem(f"Layer {i + 1}"))
+
+        # Re-display current
+        self.nav_list.setCurrentItem(self.general_item)
+
+
     def eventFilter(self, source, event):
         if source == self.nav_list.viewport() and event.type() == event.Type.MouseButtonPress:
             item = self.nav_list.itemAt(event.pos())
@@ -93,26 +151,22 @@ class FinSolverMainWindow(QMainWindow):
                 return True
         return super().eventFilter(source, event)
 
-    def init_menu(self):
-        menubar = self.menuBar()
-        menubar.addMenu("File")
-        menubar.addMenu("Properties")
-        run_menu = menubar.addMenu("Run")
-        run_action = QAction("Run Simulation", self)
-        run_action.triggered.connect(self.run_simulation)
-        run_menu.addAction(run_action)
 
-    def make_input_with_units(self, value, units_list, default_unit, setter):
+
+    def make_input_with_units(self, si_value, units_list, default_unit, setter):
         container = QWidget()
         layout = QHBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
 
-        input_field = QLineEdit(str(value))
         unit_box = QComboBox()
         unit_box.addItems(units_list)
         unit_box.setCurrentText(default_unit)
 
-        def on_change():
+        # Initial display conversion
+        display_value = convert_from_si(si_value, unit_box.currentText())
+        input_field = QLineEdit(f"{display_value:.4g}")
+
+        def update_si_value():
             try:
                 val = float(input_field.text())
                 si_val = convert_to_si(val, unit_box.currentText())
@@ -120,13 +174,23 @@ class FinSolverMainWindow(QMainWindow):
             except ValueError:
                 pass
 
-        input_field.editingFinished.connect(on_change)
-        unit_box.activated.connect(lambda _: on_change())
+        def on_unit_change():
+            try:
+                # Convert current SI value to new unit and update field
+                new_val = convert_from_si(si_value, unit_box.currentText())
+                input_field.setText(f"{new_val:.4g}")
+            except ValueError:
+                pass
+
+        input_field.editingFinished.connect(update_si_value)
+        unit_box.currentTextChanged.connect(on_unit_change)
+        unit_box.activated.connect(lambda _: unit_box.hidePopup())
 
         layout.addWidget(input_field)
         layout.addWidget(unit_box)
         container.setLayout(layout)
         return container
+
 
     def display_editor(self, current, previous=None):
         if not current:
