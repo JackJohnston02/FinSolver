@@ -8,15 +8,18 @@ class GeneralSettings:
 
 @dataclass
 class Layer:
-    material: str
-    E: float               # Pa
-    G: float               # Pa
-    thickness: float       # m
-    root_chord: float      # m
-    tip_chord: float       # m
+    material: str = "Carbon Fiber"
+    E: float = 70e9             # Young's Modulus, Pa
+    G: float = 5e9              # Shear Modulus, Pa
+    thickness: float = 0.003    # meters
+    root_chord: float = 0.2     # meters
+    tip_chord: float = 0.06     # meters
+    height: float = 0.06        # meters
+    density: float = 1600       # kg/m^3
+    poisson_ratio: float = 0.3  # dimensionless
 
 @dataclass
 class FinConfig:
     general: GeneralSettings = GeneralSettings()
-    core_layer: Layer = Layer("Carbon Fiber", 70e9, 5e9, 0.003, 0.2, 0.06)
+    core_layer: Layer = Layer()
     additional_layers: List[Layer] = field(default_factory=list)

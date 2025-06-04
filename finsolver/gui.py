@@ -19,7 +19,7 @@ class FinSolverMainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.config = FinConfig()
-        self.setWindowTitle("FinSolver -Fin Flutter Analysis")
+        self.setWindowTitle("FinSolver - Fin Flutter Analysis")
         self.setGeometry(100, 100, 1000, 600)
         self.last_delete_time = 0
         self.user_clicked_add = False
@@ -255,25 +255,63 @@ class FinSolverMainWindow(QMainWindow):
 
         elif name == "Core Layer":
             core = self.config.core
-            self.editor_form.addRow("Material:", QLineEdit(core.material))
-            self.editor_form.addRow("Young's Modulus:", self.make_input_with_units(core.E, ["GPa", "MPa"], "GPa", lambda val: setattr(core, "E", val)))
-            self.editor_form.addRow("Shear Modulus:", self.make_input_with_units(core.G, ["GPa", "MPa"], "GPa", lambda val: setattr(core, "G", val)))
-            self.editor_form.addRow("Thickness:", self.make_input_with_units(core.thickness, ["mm", "cm", "in", "m"], "mm", lambda val: setattr(core, "thickness", val)))
+
+            # Subtitle for Geometry
+            subtitle_geometry = QLabel("Geometry:")
+            subtitle_geometry.setStyleSheet("font-weight: bold; margin-top: 10px; margin-left: -4px;")
+            self.editor_form.addRow(subtitle_geometry)
+
             self.editor_form.addRow("Root Chord:", self.make_input_with_units(core.root_chord, ["mm", "cm", "in", "m"], "mm", lambda val: setattr(core, "root_chord", val)))
             self.editor_form.addRow("Tip Chord:", self.make_input_with_units(core.tip_chord, ["mm", "cm", "in", "m"], "mm", lambda val: setattr(core, "tip_chord", val)))
+            self.editor_form.addRow("Height:", self.make_input_with_units(core.height, ["mm", "cm", "in", "m"], "mm", lambda val: setattr(core, "height", val)))
+            self.editor_form.addRow("Sweep Length:", self.make_input_with_units(core.sweep_length, ["mm", "cm", "in", "m"], "mm", lambda val: setattr(core, "sweep_length", val)))
+            self.editor_form.addRow("Thickness:", self.make_input_with_units(core.thickness, ["mm", "cm", "in", "m"], "mm", lambda val: setattr(core, "thickness", val)))
+
+            # Subtitle for Material Properties
+            subtitle_material = QLabel("Material Properties:")
+            subtitle_material.setStyleSheet("font-weight: bold; margin-top: 10px; margin-left: -4px;")
+            self.editor_form.addRow(subtitle_material)
+
+            self.editor_form.addRow("Material:", QLineEdit(core.material))
+
+            self.editor_form.addRow("Young's Modulus:", self.make_input_with_units(core.E, ["GPa", "MPa"], "GPa", lambda val: setattr(core, "E", val)))
+            self.editor_form.addRow("Shear Modulus:", self.make_input_with_units(core.G, ["GPa", "MPa"], "GPa", lambda val: setattr(core, "G", val)))
+            self.editor_form.addRow("Density:", self.make_input_with_units(core.density, ["kg/m³"], "kg/m³", lambda val: setattr(core, "density", val)))
+            self.editor_form.addRow("Poisson's Ratio:", QLineEdit(str(core.poisson_ratio)))
+
             self.delete_button.hide()
+
+
 
         elif name.startswith("Layer"):
             index = self.get_layer_index(name)
             if index is not None and 0 <= index < len(self.config.layers):
                 layer = self.config.layers[index]
+
+                # Geometry subtitle
+                subtitle_geo = QLabel("Geometry:")
+                subtitle_geo.setStyleSheet("font-weight: bold; margin-top: 10px; margin-left: -4px;")
+                self.editor_form.addRow(subtitle_geo)
+
+                self.editor_form.addRow("Root Chord:", self.make_input_with_units(layer.root_chord, ["mm", "cm", "in", "m"], "mm", lambda val: setattr(layer, "root_chord", val)))
+                self.editor_form.addRow("Tip Chord:", self.make_input_with_units(layer.tip_chord, ["mm", "cm", "in", "m"], "mm", lambda val: setattr(layer, "tip_chord", val)))
+                self.editor_form.addRow("Height:", self.make_input_with_units(layer.height, ["mm", "cm", "in", "m"], "mm", lambda val: setattr(layer, "height", val)))
+                self.editor_form.addRow("Sweep Length:", self.make_input_with_units(layer.sweep_length, ["mm", "cm", "in", "m"], "mm", lambda val: setattr(layer, "sweep_length", val)))
+                self.editor_form.addRow("Thickness:", self.make_input_with_units(layer.thickness, ["mm", "cm", "in", "m"], "mm", lambda val: setattr(layer, "thickness", val)))
+
+                # Material subtitle
+                subtitle_mat = QLabel("Material Properties:")
+                subtitle_mat.setStyleSheet("font-weight: bold; margin-top: 10px; margin-left: -4px;")
+                self.editor_form.addRow(subtitle_mat)
+
                 self.editor_form.addRow("Material:", QLineEdit(layer.material))
                 self.editor_form.addRow("Young's Modulus:", self.make_input_with_units(layer.E, ["GPa", "MPa"], "GPa", lambda val: setattr(layer, "E", val)))
                 self.editor_form.addRow("Shear Modulus:", self.make_input_with_units(layer.G, ["GPa", "MPa"], "GPa", lambda val: setattr(layer, "G", val)))
-                self.editor_form.addRow("Thickness:", self.make_input_with_units(layer.thickness, ["mm", "cm", "in", "m"], "mm", lambda val: setattr(layer, "thickness", val)))
-                self.editor_form.addRow("Root Chord:", self.make_input_with_units(layer.root_chord, ["mm", "cm", "in", "m"], "mm", lambda val: setattr(layer, "root_chord", val)))
-                self.editor_form.addRow("Tip Chord:", self.make_input_with_units(layer.tip_chord, ["mm", "cm", "in", "m"], "mm", lambda val: setattr(layer, "tip_chord", val)))
+                self.editor_form.addRow("Density:", self.make_input_with_units(layer.density, ["kg/m³"], "kg/m³", lambda val: setattr(layer, "density", val)))
+                self.editor_form.addRow("Poisson's Ratio:", QLineEdit(str(layer.poisson_ratio)))
+
             self.delete_button.show()
+
         else:
             self.delete_button.hide()
 
