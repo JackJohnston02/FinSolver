@@ -201,7 +201,7 @@ class FinSolverMainWindow(QMainWindow):
 
 
 
-    def make_input_with_units(self, si_value, units_list, default_unit, setter):
+    def make_input_with_units(self, si_value, units_list, default_unit, setter, on_change_callback=None):
         container = QWidget()
         layout = QHBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
@@ -215,13 +215,17 @@ class FinSolverMainWindow(QMainWindow):
         input_field = QLineEdit(f"{display_value:.4g}")
 
         def update_si_value():
+            print("[DEBUG] update_si_value called")
             try:
                 val = float(input_field.text())
                 si_val = convert_to_si(val, unit_box.currentText())
                 setter(si_val)
-                self.visual_view.update()  # Trigger visual refresh
+                if on_change_callback:
+                    print("[DEBUG] on_change_callback exists — calling")
+                    on_change_callback()
+                self.visual_view.update()
             except ValueError:
-                pass
+                print("[DEBUG] invalid input for unit field")
 
 
         def on_unit_change():
@@ -240,6 +244,7 @@ class FinSolverMainWindow(QMainWindow):
         layout.addWidget(unit_box)
         container.setLayout(layout)
         return container
+
 
 
     def display_editor(self, current, previous=None):
@@ -299,43 +304,86 @@ class FinSolverMainWindow(QMainWindow):
             
             
 
-        elif name.startswith("Layer"): 
+        elif name.startswith("Layer"):
             index = self.get_layer_index(name)
             if index is not None and 0 <= index < len(self.config.layers):
                 layer = self.config.layers[index]
 
-                # --- Geometry Section Title ---
                 geo_title = QLabel("Geometry:")
                 geo_title.setStyleSheet("font-weight: bold; margin-top: 10px; margin-left: -4px;")
                 self.editor_form.addRow(geo_title)
 
-                # --- Instep Checkbox ---
                 instep_checkbox = QCheckBox("Instep from Previous Layer")
                 instep_checkbox.setChecked(layer.instep_enabled)
                 self.editor_form.addRow(instep_checkbox)
 
-                # --- Instep Distance Field ---
+                # --- Placeholder for inputs + unit selectors ---
+                self._root_input_field = None
+                self._root_unit_box = None
+                self._tip_input_field = None
+                self._tip_unit_box = None
+                self._height_input_field = None
+                self._height_unit_box = None
+                self._sweep_input_field = None
+                self._sweep_unit_box = None
+
+                # --- Geometry update logic ---
+                def update_geometry_fields_from_layer():
+                    from finsolver.units import convert_from_si  # ensure import is available
+                    def set_value(line_edit, combo_box, si_value):
+                        if line_edit and combo_box:
+                            unit = combo_box.currentText()
+                            val = convert_from_si(si_value, unit)
+                            line_edit.setText(f"{val:.4g}")
+
+                    set_value(self._root_input_field, self._root_unit_box, layer.root_chord)
+                    set_value(self._tip_input_field, self._tip_unit_box, layer.tip_chord)
+                    set_value(self._height_input_field, self._height_unit_box, layer.height)
+                    set_value(self._sweep_input_field, self._sweep_unit_box, layer.sweep_length)
+
+                def handle_instep_change():
+                    if layer.instep_enabled:
+                        self.apply_instep_geometry(index)
+                        update_geometry_fields_from_layer()
+                        self.visual_view.update()
+
                 instep_input = self.make_input_with_units(
                     layer.instep_value,
                     ["mm", "cm", "in", "m"],
                     "mm",
-                    lambda val: setattr(layer, "instep_value", val)
+                    lambda val: setattr(layer, "instep_value", val),
+                    on_change_callback=handle_instep_change
                 )
                 self.editor_form.addRow("Instep Distance:", instep_input)
 
                 # --- Geometry Inputs ---
+                def capture_field_refs(widget, input_attr, unit_attr):
+                    setattr(self, input_attr, widget.findChild(QLineEdit))
+                    setattr(self, unit_attr, widget.findChild(QComboBox))
+
                 root_input = self.make_input_with_units(
-                    layer.root_chord, ["mm", "cm", "in", "m"], "mm", lambda val: setattr(layer, "root_chord", val)
+                    layer.root_chord, ["mm", "cm", "in", "m"], "mm",
+                    lambda val: setattr(layer, "root_chord", val)
                 )
+                capture_field_refs(root_input, "_root_input_field", "_root_unit_box")
+
                 tip_input = self.make_input_with_units(
-                    layer.tip_chord, ["mm", "cm", "in", "m"], "mm", lambda val: setattr(layer, "tip_chord", val)
+                    layer.tip_chord, ["mm", "cm", "in", "m"], "mm",
+                    lambda val: setattr(layer, "tip_chord", val)
                 )
+                capture_field_refs(tip_input, "_tip_input_field", "_tip_unit_box")
+
                 height_input = self.make_input_with_units(
-                    layer.height, ["mm", "cm", "in", "m"], "mm", lambda val: setattr(layer, "height", val)
+                    layer.height, ["mm", "cm", "in", "m"], "mm",
+                    lambda val: setattr(layer, "height", val)
                 )
+                capture_field_refs(height_input, "_height_input_field", "_height_unit_box")
+
                 sweep_input = self.make_input_with_units(
-                    layer.sweep_length, ["mm", "cm", "in", "m"], "mm", lambda val: setattr(layer, "sweep_length", val)
+                    layer.sweep_length, ["mm", "cm", "in", "m"], "mm",
+                    lambda val: setattr(layer, "sweep_length", val)
                 )
+                capture_field_refs(sweep_input, "_sweep_input_field", "_sweep_unit_box")
 
                 geometry_inputs = [root_input, tip_input, height_input, sweep_input]
 
@@ -343,23 +391,31 @@ class FinSolverMainWindow(QMainWindow):
                     print(f"[DEBUG] Instep checkbox toggled. Enabled: {enabled}")
                     instep_input.setEnabled(enabled)
                     for widget in geometry_inputs:
-                        widget.setDisabled(enabled)
+                        line_edit = widget.findChild(QLineEdit)
+                        unit_box = widget.findChild(QComboBox)
+                        if line_edit:
+                            line_edit.setDisabled(enabled)
+                        if unit_box:
+                            unit_box.setEnabled(True)  # Always allow unit box to change
+
                     layer.instep_enabled = enabled
 
-                # Initial state
-                update_instep_state(layer.instep_enabled)
+                    if enabled:
+                        self.apply_instep_geometry(index)
+                        update_geometry_fields_from_layer()
 
-                # React to checkbox changes
+                    self.visual_view.update()
+
+                update_instep_state(layer.instep_enabled)
                 instep_checkbox.toggled.connect(lambda checked: update_instep_state(checked))
 
-
-                # Add geometry inputs
+                # Add geometry rows
                 self.editor_form.addRow("Root Chord:", root_input)
                 self.editor_form.addRow("Tip Chord:", tip_input)
                 self.editor_form.addRow("Height:", height_input)
                 self.editor_form.addRow("Sweep Length:", sweep_input)
 
-                # --- Material Properties Title ---
+                # --- Material Section ---
                 mat_title = QLabel("Material Properties:")
                 mat_title.setStyleSheet("font-weight: bold; margin-top: 10px; margin-left: -4px;")
                 self.editor_form.addRow(mat_title)
@@ -371,6 +427,8 @@ class FinSolverMainWindow(QMainWindow):
                 self.editor_form.addRow("Poisson's Ratio:", QLineEdit(str(layer.poisson_ratio)))
 
                 self.delete_button.show()
+
+
 
         else:
             self.delete_button.hide()
@@ -419,6 +477,12 @@ class FinSolverMainWindow(QMainWindow):
 
                 QTimer.singleShot(0, update_selection)
 
+        # Ensure the visual view reflects the updated layer list
+        self.visual_view.set_config(self.config)
+        self.visual_view.set_selected_layer(-1)
+        self.visual_view.update()
+
+
     def renumber_layers(self):
         count = 1
         for i in range(self.nav_list.count()):
@@ -429,6 +493,31 @@ class FinSolverMainWindow(QMainWindow):
 
     def run_simulation(self):
         QMessageBox.information(self, "Simulation", "Flutter analysis would run here.")
+
+    def apply_instep_geometry(self, layer_index: int):
+        print(f"[DEBUG] apply_instep_geometry called for layer {layer_index}")
+        """Apply geometry from the previous layer with the given instep offset."""
+       
+        current_layer = self.config.layers[layer_index]
+       
+        if layer_index == 0:
+            prev_layer = self.config.core
+        else:
+            prev_layer = prev_layer = self.config.layers[layer_index - 1]
+
+        offset = current_layer.instep_value
+
+        # Apply offset to geometry (clamping to zero to avoid negatives)
+        current_layer.root_chord = max(prev_layer.root_chord - offset, 0)
+        current_layer.tip_chord = max(prev_layer.tip_chord - offset, 0)
+        current_layer.height = max(prev_layer.height - offset, 0)
+        current_layer.sweep_length = max(prev_layer.sweep_length - offset, 0)
+
+
+
+
+        print(f"[INFO] Instep geometry applied to Layer {layer_index + 1}")
+
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)

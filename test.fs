@@ -7,7 +7,13 @@
     "G": 5000000000.0,
     "thickness": 0.003,
     "root_chord": 0.2,
-    "tip_chord": 0.06
+    "tip_chord": 0.06,
+    "height": 0.1,
+    "sweep_length": 0.05,
+    "density": 1600.0,
+    "poisson_ratio": 0.3,
+    "instep_enabled": false,
+    "instep_value": 0.0
   },
   "layers": [
     {
@@ -15,24 +21,84 @@
       "E": 70000000000.0,
       "G": 5000000000.0,
       "thickness": 0.003,
-      "root_chord": 0.2,
-      "tip_chord": 0.06
+      "root_chord": 0.19,
+      "tip_chord": 0.049999999999999996,
+      "height": 0.09000000000000001,
+      "sweep_length": 0.04,
+      "density": 1600.0,
+      "poisson_ratio": 0.3,
+      "instep_enabled": true,
+      "instep_value": 0.01
     },
     {
       "material": "Carbon Fiber",
       "E": 70000000000.0,
       "G": 5000000000.0,
       "thickness": 0.003,
-      "root_chord": 0.2,
-      "tip_chord": 0.06
+      "root_chord": 0.18,
+      "tip_chord": 0.039999999999999994,
+      "height": 0.08000000000000002,
+      "sweep_length": 0.03,
+      "density": 1600.0,
+      "poisson_ratio": 0.3,
+      "instep_enabled": true,
+      "instep_value": 0.01
     },
     {
       "material": "Carbon Fiber",
       "E": 70000000000.0,
       "G": 5000000000.0,
       "thickness": 0.003,
-      "root_chord": 0.2,
-      "tip_chord": 0.06
+      "root_chord": 0.16999999999999998,
+      "tip_chord": 0.029999999999999992,
+      "height": 0.07000000000000002,
+      "sweep_length": 0.019999999999999997,
+      "density": 1600.0,
+      "poisson_ratio": 0.3,
+      "instep_enabled": true,
+      "instep_value": 0.01
+    },
+    {
+      "material": "Carbon Fiber",
+      "E": 70000000000.0,
+      "G": 5000000000.0,
+      "thickness": 0.003,
+      "root_chord": 0.15999999999999998,
+      "tip_chord": 0.01999999999999999,
+      "height": 0.06000000000000002,
+      "sweep_length": 0.009999999999999997,
+      "density": 1600.0,
+      "poisson_ratio": 0.3,
+      "instep_enabled": true,
+      "instep_value": 0.01
+    },
+    {
+      "material": "Carbon Fiber",
+      "E": 70000000000.0,
+      "G": 5000000000.0,
+      "thickness": 0.003,
+      "root_chord": 0.14999999999999997,
+      "tip_chord": 0.00999999999999999,
+      "height": 0.05000000000000002,
+      "sweep_length": 0,
+      "density": 1600.0,
+      "poisson_ratio": 0.3,
+      "instep_enabled": true,
+      "instep_value": 0.01
+    },
+    {
+      "material": "Carbon Fiber",
+      "E": 70000000000.0,
+      "G": 5000000000.0,
+      "thickness": 0.003,
+      "root_chord": 0.13999999999999996,
+      "tip_chord": 0,
+      "height": 0.040000000000000015,
+      "sweep_length": 0,
+      "density": 1600.0,
+      "poisson_ratio": 0.3,
+      "instep_enabled": true,
+      "instep_value": 0.01
     }
   ]
 }
