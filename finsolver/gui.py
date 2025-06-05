@@ -261,7 +261,12 @@ class FinSolverMainWindow(QMainWindow):
         if name == "General Settings":
             self.editor_form.addRow("Body Tube OD:", self.make_input_with_units(
                 self.config.body_tube_od, ["mm", "cm", "in", "m"], "mm", lambda val: setattr(self.config, "body_tube_od", val)))
-            self.editor_form.addRow("Number of Fins:", QLineEdit(str(self.config.num_fins)))
+            num_fins_input = QLineEdit(str(self.config.num_fins))
+            num_fins_input.editingFinished.connect(lambda: (
+                setattr(self.config, "num_fins", int(num_fins_input.text())),
+                self.visual_view.update()
+            ))
+            self.editor_form.addRow("Number of Fins:", num_fins_input)
             self.delete_button.hide()
 
         elif name == "Core Layer":
