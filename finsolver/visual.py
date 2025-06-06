@@ -65,5 +65,4 @@ class FinCrossSectionView(QWidget):
 
         # Draw additional layers
         for i, layer in enumerate(self.config.layers):
-            y_offset += layer.thickness * 1000
             draw_layer(layer, self.selected_layer_index == i + 1, y_offset)
