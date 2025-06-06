@@ -12,7 +12,7 @@ from time import time
 from finsolver.config import FinConfig, FinLayerData
 from finsolver.units import convert_to_si, convert_from_si
 from finsolver.visual import FinCrossSectionView
-
+from finsolver.flutter_analysis import calculate_flutter
 
 from PyQt6.QtWidgets import QFileDialog
 import json
@@ -264,8 +264,18 @@ class FinSolverMainWindow(QMainWindow):
             self.editor_form.removeRow(0)
 
         if name == "General Settings":
+            # Subtitle for Geometry
+            subtitle_geometry = QLabel("Geometry:")
+            subtitle_geometry.setStyleSheet("font-weight: bold; margin-top: 10px; margin-left: -4px;")
+            self.editor_form.addRow(subtitle_geometry)
+
             self.editor_form.addRow("Body Tube OD:", self.make_input_with_units(
                 self.config.body_tube_od, ["mm", "cm", "in", "m"], "mm", lambda val: setattr(self.config, "body_tube_od", val)))
+            
+            self.editor_form.addRow("Fillet Radius:", self.make_input_with_units(
+                self.config.fillet_radius, ["mm", "cm", "in", "m"], "mm", lambda val: setattr(self.config, "fillet_radius", val)))
+            
+            
             num_fins_input = QLineEdit(str(self.config.num_fins))
             num_fins_input.editingFinished.connect(lambda: (
                 setattr(self.config, "num_fins", int(num_fins_input.text())),
@@ -273,6 +283,18 @@ class FinSolverMainWindow(QMainWindow):
             ))
             self.editor_form.addRow("Number of Fins:", num_fins_input)
             self.delete_button.hide()
+
+            subtitle_geometry = QLabel("Fillet Properties:")
+            subtitle_geometry.setStyleSheet("font-weight: bold; margin-top: 10px; margin-left: -4px;")
+            self.editor_form.addRow(subtitle_geometry)
+            
+            self.editor_form.addRow("Material:", QLineEdit(self.config.fillet.material))
+            self.editor_form.addRow("Density:", self.make_input_with_units(self.config.fillet.density, ["kg/m³"], "kg/m³", lambda val: setattr(self.config.fillet, "density", val)))
+            self.editor_form.addRow("Young's Modulus:", self.make_input_with_units(self.config.fillet.E, ["GPa", "MPa"], "GPa", lambda val: setattr(self.config.fillet, "E", val)))
+            self.editor_form.addRow("Shear Modulus:", self.make_input_with_units(self.config.fillet.G, ["GPa", "MPa"], "GPa", lambda val: setattr(self.config.fillet, "G", val)))
+            self.editor_form.addRow("Poisson's Ratio:", QLineEdit(str(self.config.fillet.poisson_ratio)))
+
+
 
         elif name == "Core Layer":
             core = self.config.core
@@ -295,9 +317,10 @@ class FinSolverMainWindow(QMainWindow):
 
             self.editor_form.addRow("Material:", QLineEdit(core.material))
 
+            self.editor_form.addRow("Density:", self.make_input_with_units(core.density, ["kg/m³"], "kg/m³", lambda val: setattr(core, "density", val)))
             self.editor_form.addRow("Young's Modulus:", self.make_input_with_units(core.E, ["GPa", "MPa"], "GPa", lambda val: setattr(core, "E", val)))
             self.editor_form.addRow("Shear Modulus:", self.make_input_with_units(core.G, ["GPa", "MPa"], "GPa", lambda val: setattr(core, "G", val)))
-            self.editor_form.addRow("Density:", self.make_input_with_units(core.density, ["kg/m³"], "kg/m³", lambda val: setattr(core, "density", val)))
+
             self.editor_form.addRow("Poisson's Ratio:", QLineEdit(str(core.poisson_ratio)))
 
             self.delete_button.hide()
@@ -420,10 +443,10 @@ class FinSolverMainWindow(QMainWindow):
                 mat_title.setStyleSheet("font-weight: bold; margin-top: 10px; margin-left: -4px;")
                 self.editor_form.addRow(mat_title)
 
+                self.editor_form.addRow("Density:", self.make_input_with_units(layer.density, ["kg/m³"], "kg/m³", lambda val: setattr(layer, "density", val)))
                 self.editor_form.addRow("Material:", QLineEdit(layer.material))
                 self.editor_form.addRow("Young's Modulus:", self.make_input_with_units(layer.E, ["GPa", "MPa"], "GPa", lambda val: setattr(layer, "E", val)))
                 self.editor_form.addRow("Shear Modulus:", self.make_input_with_units(layer.G, ["GPa", "MPa"], "GPa", lambda val: setattr(layer, "G", val)))
-                self.editor_form.addRow("Density:", self.make_input_with_units(layer.density, ["kg/m³"], "kg/m³", lambda val: setattr(layer, "density", val)))
                 self.editor_form.addRow("Poisson's Ratio:", QLineEdit(str(layer.poisson_ratio)))
 
                 self.delete_button.show()
@@ -492,18 +515,22 @@ class FinSolverMainWindow(QMainWindow):
                 count += 1
 
     def run_simulation(self):
-        QMessageBox.information(self, "Simulation", "Flutter analysis would run here.")
+        try:
+            result_summary = calculate_flutter(self.config)
+            QMessageBox.information(self, "Flutter Simulation", result_summary)
+        except Exception as e:
+            QMessageBox.critical(self, "Simulation Error", f"An error occurred:\n{str(e)}")
 
     def apply_instep_geometry(self, layer_index: int):
         print(f"[DEBUG] apply_instep_geometry called for layer {layer_index}")
         """Apply geometry from the previous layer with the given instep offset."""
-       
+
         current_layer = self.config.layers[layer_index]
-       
+
         if layer_index == 0:
             prev_layer = self.config.core
         else:
-            prev_layer = prev_layer = self.config.layers[layer_index - 1]
+            prev_layer = self.config.layers[layer_index - 1]
 
         offset = current_layer.instep_value
 
@@ -513,10 +540,8 @@ class FinSolverMainWindow(QMainWindow):
         current_layer.height = max(prev_layer.height - offset, 0)
         current_layer.sweep_length = max(prev_layer.sweep_length - offset, 0)
 
-
-
-
         print(f"[INFO] Instep geometry applied to Layer {layer_index + 1}")
+
 
 
 if __name__ == '__main__':
