@@ -1,0 +1,67 @@
+Project Title: Supersonic Fin Flutter Solver  
+Version: 1.0  
+Language: Python 3.x  
+Environment: Cross-platform (Linux, macOS, Windows)
+
+--------------------------------------------------------------------------------
+1. General Requirements
+--------------------------------------------------------------------------------
+- The solver shall be written entirely in Python using only open-source libraries.
+- The codebase shall be modular and clearly structured to support future extensions.
+- The solver shall provide both a CLI and GUI for user interaction.
+- All physical models shall be documented, citing governing equations and assumptions.
+
+--------------------------------------------------------------------------------
+2. Structural Modeling
+--------------------------------------------------------------------------------
+- The solver shall support layered composite fin geometries, with user-defined ply materials and orientations.
+- The solver shall accept trapezoidal fin geometries with arbitrary layer dimensions.
+- Structural properties (mass, centroid, inertia, stiffness) shall be computed analytically or semi-analytically.
+- A homogenization procedure shall be included for combining layered composite properties.
+
+--------------------------------------------------------------------------------
+3. Aerodynamic Modeling
+--------------------------------------------------------------------------------
+- The initial aerodynamic model shall be based on first-order piston theory, valid for Mach > 1.2.
+- The aerodynamic loads shall be coupled to structural modes or DOFs for flutter analysis.
+- The solver architecture shall permit upgrading to more advanced aerodynamic models (e.g., linearized supersonic theory or CFD coupling).
+
+--------------------------------------------------------------------------------
+4. Flutter Analysis
+--------------------------------------------------------------------------------
+- The solver shall compute aeroelastic stability using eigenvalue analysis.
+- The solver shall perform velocity sweeps to determine the flutter boundary.
+- Output plots shall include damping ratio vs freestream velocity, and indicate flutter onset.
+- Flutter Mach number and critical speed shall be clearly reported.
+
+--------------------------------------------------------------------------------
+5. Input/Output
+--------------------------------------------------------------------------------
+- The solver shall read configuration files in YAML format.
+- Required inputs shall include: fin geometry, material properties, air properties, and flight conditions.
+- Outputs shall include: mass properties, stiffness properties, flutter speed, and plots.
+- Results shall be exportable in both human-readable (CSV, plots) and machine-readable (JSON/YAML) formats.
+
+--------------------------------------------------------------------------------
+6. User Interface
+--------------------------------------------------------------------------------
+- The solver shall include a lightweight graphical user interface (GUI) built using PyQt, tkinter, or similar.
+- The GUI shall allow users to:
+  - Load and edit YAML configuration files
+  - Launch analysis routines
+  - View and export graphical outputs
+- The GUI shall validate user inputs for completeness and consistency.
+
+--------------------------------------------------------------------------------
+7. Testing and Validation
+--------------------------------------------------------------------------------
+- The solver shall include unit tests for each core module.
+- Flutter predictions shall be benchmarked against at least one published reference case.
+- Debugging outputs shall be available in verbose mode for diagnostic use.
+
+--------------------------------------------------------------------------------
+8. Documentation
+--------------------------------------------------------------------------------
+- A README shall describe setup, installation, and usage.
+- Inline documentation shall be provided for all functions and modules.
+- A user guide shall describe the GUI, inputs, and expected outputs.
