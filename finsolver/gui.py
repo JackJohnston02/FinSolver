@@ -1,0 +1,551 @@
+import sys
+from PyQt6.QtWidgets import (
+    QApplication, QMainWindow, QWidget, QLabel, QVBoxLayout, QHBoxLayout,
+    QFormLayout, QLineEdit, QPushButton, QListWidget, QListWidgetItem,
+    QMenuBar, QMenu, QFrame, QMessageBox, QComboBox, QCheckBox
+)
+
+from PyQt6.QtWidgets import QCheckBox, QLineEdit, QHBoxLayout, QWidget
+from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtGui import QAction, QKeyEvent
+from time import time
+from finsolver.config import FinConfig, FinLayerData
+from finsolver.units import convert_to_si, convert_from_si
+from finsolver.visual import FinCrossSectionView
+from finsolver.flutter_analysis import calculate_flutter
+
+from PyQt6.QtWidgets import QFileDialog
+import json
+import os
+
+
+class FinSolverMainWindow(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.config = FinConfig()
+        self.setWindowTitle("FinSolver - Fin Flutter Analysis")
+        self.setGeometry(100, 100, 1000, 600)
+        self.last_delete_time = 0
+        self.user_clicked_add = False
+        self.config = FinConfig()
+        self.init_ui()
+        self.current_file = None
+
+
+
+    def init_menu(self):
+        menubar = self.menuBar()
+        file_menu = menubar.addMenu("File")
+
+        # --- File operations ---
+        new_action = QAction("New", self)
+        new_action.triggered.connect(self.new_config)
+        file_menu.addAction(new_action)
+
+        open_action = QAction("Open", self)
+        open_action.triggered.connect(self.import_config)
+        file_menu.addAction(open_action)
+
+        save_action = QAction("Save", self)
+        save_action.triggered.connect(self.save_config)
+        file_menu.addAction(save_action)
+
+        save_as_action = QAction("Save As", self)
+        save_as_action.triggered.connect(self.save_config_as)
+        file_menu.addAction(save_as_action)
+
+        export_action = QAction("Export (.fs)", self)
+        export_action.triggered.connect(self.export_config)
+        file_menu.addAction(export_action)
+
+        # --- Other menus ---
+        menubar.addMenu("Properties")
+        run_menu = menubar.addMenu("Run")
+        run_action = QAction("Run Simulation", self)
+        run_action.triggered.connect(self.run_simulation)
+        run_menu.addAction(run_action)
+
+
+
+
+
+    def init_ui(self):
+        self.init_menu()
+
+        main_widget = QWidget()
+        main_layout = QHBoxLayout()
+
+        # --- Navigation ---
+        self.nav_list = QListWidget()
+        self.general_item = QListWidgetItem("General Settings")
+        self.core_item = QListWidgetItem("Core Layer")
+        self.add_layer_item = QListWidgetItem("+ Add Layer")
+
+        self.nav_list.addItem(self.general_item)
+        self.nav_list.addItem(self.core_item)
+        self.nav_list.addItem(self.add_layer_item)
+        self.nav_list.currentItemChanged.connect(self.display_editor)
+        self.nav_list.viewport().installEventFilter(self)
+        self.nav_list.installEventFilter(self)
+
+        # --- Editor Panel ---
+        self.editor_panel = QVBoxLayout()
+        self.editor_form = QFormLayout()
+        self.editor_widget = QWidget()
+        self.editor_widget.setLayout(self.editor_form)
+
+        self.delete_button = QPushButton("Delete This Layer")
+        self.delete_button.clicked.connect(self.delete_selected_layer)
+        self.delete_button.hide()
+
+        self.editor_panel.addWidget(self.editor_widget)
+        self.editor_panel.addWidget(self.delete_button)
+
+        left_side = QHBoxLayout()
+        left_side.addWidget(self.nav_list)
+
+        editor_container = QWidget()
+        editor_container.setLayout(self.editor_panel)
+        left_side.addWidget(editor_container)
+
+        left_widget = QWidget()
+        left_widget.setLayout(left_side)
+
+        # --- Visualization View ---
+        self.visual_view = FinCrossSectionView(self.config)
+        self.visual_view.setMinimumHeight(300)
+
+        visual_widget = QWidget()
+        visual_layout = QVBoxLayout()
+        visual_layout.addWidget(self.visual_view)
+        visual_widget.setLayout(visual_layout)
+
+        # --- Combine Panels ---
+        main_layout.addWidget(left_widget, 2)
+        main_layout.addWidget(visual_widget, 2)
+
+        main_widget.setLayout(main_layout)
+        self.setCentralWidget(main_widget)
+
+        self.display_editor(self.nav_list.currentItem())
+
+
+
+    def new_config(self):
+        self.config = FinConfig()
+        self.refresh_gui_from_config()
+        self.current_file = None
+
+    def save_config(self):
+        if hasattr(self, "current_file") and self.current_file:
+            with open(self.current_file, "w") as f:
+                json.dump(self.config.to_dict(), f, indent=2)
+        else:
+            self.save_config_as()
+
+    def save_config_as(self):
+        file_path, _ = QFileDialog.getSaveFileName(self, "Save As", "", "FinSolver Files (*.fs)")
+        if file_path:
+            if not file_path.endswith(".fs"):
+                file_path += ".fs"
+            self.current_file = file_path
+            self.save_config()
+
+    def import_config(self):
+        file_path, _ = QFileDialog.getOpenFileName(self, "Open", "", "FinSolver Files (*.fs)")
+        if file_path and os.path.exists(file_path):
+            with open(file_path, "r") as f:
+                data = json.load(f)
+                self.config = FinConfig.from_dict(data)
+            self.current_file = file_path
+            self.refresh_gui_from_config()
+
+    def export_config(self):
+        file_path, _ = QFileDialog.getSaveFileName(self, "Export Config", "", "FinSolver Files (*.fs)")
+        if file_path:
+            if not file_path.endswith(".fs"):
+                file_path += ".fs"
+            with open(file_path, "w") as f:
+                json.dump(self.config.to_dict(), f, indent=2)
+
+
+
+    def refresh_gui_from_config(self):
+        # Clear all user-defined layers
+        for i in reversed(range(self.nav_list.count())):
+            item = self.nav_list.item(i)
+            if item.text().startswith("Layer"):
+                self.nav_list.takeItem(i)
+
+        # Recreate layer items
+        for i in range(len(self.config.layers)):
+            self.nav_list.insertItem(self.nav_list.row(self.add_layer_item), QListWidgetItem(f"Layer {i + 1}"))
+
+        # Re-display current
+        self.nav_list.setCurrentItem(self.general_item)
+
+
+    def eventFilter(self, source, event):
+        if source == self.nav_list.viewport() and event.type() == event.Type.MouseButtonPress:
+            item = self.nav_list.itemAt(event.pos())
+            if item == self.add_layer_item:
+                self.user_clicked_add = True
+        elif source == self.nav_list and isinstance(event, QKeyEvent):
+            if event.key() == Qt.Key.Key_Delete:
+                now = time()
+                if now - self.last_delete_time > 0.3:
+                    self.last_delete_time = now
+                    self.delete_selected_layer()
+                return True
+        return super().eventFilter(source, event)
+
+
+
+    def make_input_with_units(self, si_value, units_list, default_unit, setter, on_change_callback=None):
+        container = QWidget()
+        layout = QHBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+
+        unit_box = QComboBox()
+        unit_box.addItems(units_list)
+        unit_box.setCurrentText(default_unit)
+
+        # Initial display conversion
+        display_value = convert_from_si(si_value, unit_box.currentText())
+        input_field = QLineEdit(f"{display_value:.4g}")
+
+        def update_si_value():
+            print("[DEBUG] update_si_value called")
+            try:
+                val = float(input_field.text())
+                si_val = convert_to_si(val, unit_box.currentText())
+                setter(si_val)
+                if on_change_callback:
+                    print("[DEBUG] on_change_callback exists — calling")
+                    on_change_callback()
+                self.visual_view.update()
+            except ValueError:
+                print("[DEBUG] invalid input for unit field")
+
+
+        def on_unit_change():
+            try:
+                # Convert current SI value to new unit and update field
+                new_val = convert_from_si(si_value, unit_box.currentText())
+                input_field.setText(f"{new_val:.4g}")
+            except ValueError:
+                pass
+
+        input_field.editingFinished.connect(update_si_value)
+        unit_box.currentTextChanged.connect(on_unit_change)
+        unit_box.activated.connect(lambda _: unit_box.hidePopup())
+
+        layout.addWidget(input_field)
+        layout.addWidget(unit_box)
+        container.setLayout(layout)
+        return container
+
+
+
+    def display_editor(self, current, previous=None):
+        if not current:
+            return
+
+        name = current.text()
+        print(f"Selected: {name}")
+
+        if name == "+ Add Layer":
+            if self.user_clicked_add:
+                self.add_new_layer()
+            self.user_clicked_add = False
+            return
+
+        while self.editor_form.rowCount():
+            self.editor_form.removeRow(0)
+
+        if name == "General Settings":
+            # Subtitle for Geometry
+            subtitle_geometry = QLabel("Geometry:")
+            subtitle_geometry.setStyleSheet("font-weight: bold; margin-top: 10px; margin-left: -4px;")
+            self.editor_form.addRow(subtitle_geometry)
+
+            self.editor_form.addRow("Body Tube OD:", self.make_input_with_units(
+                self.config.body_tube_od, ["mm", "cm", "in", "m"], "mm", lambda val: setattr(self.config, "body_tube_od", val)))
+            
+            self.editor_form.addRow("Fillet Radius:", self.make_input_with_units(
+                self.config.fillet_radius, ["mm", "cm", "in", "m"], "mm", lambda val: setattr(self.config, "fillet_radius", val)))
+            
+            
+            num_fins_input = QLineEdit(str(self.config.num_fins))
+            num_fins_input.editingFinished.connect(lambda: (
+                setattr(self.config, "num_fins", int(num_fins_input.text())),
+                self.visual_view.update()
+            ))
+            self.editor_form.addRow("Number of Fins:", num_fins_input)
+            self.delete_button.hide()
+
+            subtitle_geometry = QLabel("Fillet Properties:")
+            subtitle_geometry.setStyleSheet("font-weight: bold; margin-top: 10px; margin-left: -4px;")
+            self.editor_form.addRow(subtitle_geometry)
+            
+            self.editor_form.addRow("Material:", QLineEdit(self.config.fillet.material))
+            self.editor_form.addRow("Density:", self.make_input_with_units(self.config.fillet.density, ["kg/m³"], "kg/m³", lambda val: setattr(self.config.fillet, "density", val)))
+            self.editor_form.addRow("Young's Modulus:", self.make_input_with_units(self.config.fillet.E, ["GPa", "MPa"], "GPa", lambda val: setattr(self.config.fillet, "E", val)))
+            self.editor_form.addRow("Shear Modulus:", self.make_input_with_units(self.config.fillet.G, ["GPa", "MPa"], "GPa", lambda val: setattr(self.config.fillet, "G", val)))
+            self.editor_form.addRow("Poisson's Ratio:", QLineEdit(str(self.config.fillet.poisson_ratio)))
+
+
+
+        elif name == "Core Layer":
+            core = self.config.core
+
+            # Subtitle for Geometry
+            subtitle_geometry = QLabel("Geometry:")
+            subtitle_geometry.setStyleSheet("font-weight: bold; margin-top: 10px; margin-left: -4px;")
+            self.editor_form.addRow(subtitle_geometry)
+
+            self.editor_form.addRow("Root Chord:", self.make_input_with_units(core.root_chord, ["mm", "cm", "in", "m"], "mm", lambda val: setattr(core, "root_chord", val)))
+            self.editor_form.addRow("Tip Chord:", self.make_input_with_units(core.tip_chord, ["mm", "cm", "in", "m"], "mm", lambda val: setattr(core, "tip_chord", val)))
+            self.editor_form.addRow("Height:", self.make_input_with_units(core.height, ["mm", "cm", "in", "m"], "mm", lambda val: setattr(core, "height", val)))
+            self.editor_form.addRow("Sweep Length:", self.make_input_with_units(core.sweep_length, ["mm", "cm", "in", "m"], "mm", lambda val: setattr(core, "sweep_length", val)))
+            self.editor_form.addRow("Thickness:", self.make_input_with_units(core.thickness, ["mm", "cm", "in", "m"], "mm", lambda val: setattr(core, "thickness", val)))
+
+            # Subtitle for Material Properties
+            subtitle_material = QLabel("Material Properties:")
+            subtitle_material.setStyleSheet("font-weight: bold; margin-top: 10px; margin-left: -4px;")
+            self.editor_form.addRow(subtitle_material)
+
+            self.editor_form.addRow("Material:", QLineEdit(core.material))
+
+            self.editor_form.addRow("Density:", self.make_input_with_units(core.density, ["kg/m³"], "kg/m³", lambda val: setattr(core, "density", val)))
+            self.editor_form.addRow("Young's Modulus:", self.make_input_with_units(core.E, ["GPa", "MPa"], "GPa", lambda val: setattr(core, "E", val)))
+            self.editor_form.addRow("Shear Modulus:", self.make_input_with_units(core.G, ["GPa", "MPa"], "GPa", lambda val: setattr(core, "G", val)))
+
+            self.editor_form.addRow("Poisson's Ratio:", QLineEdit(str(core.poisson_ratio)))
+
+            self.delete_button.hide()
+            
+            
+
+        elif name.startswith("Layer"):
+            index = self.get_layer_index(name)
+            if index is not None and 0 <= index < len(self.config.layers):
+                layer = self.config.layers[index]
+
+                geo_title = QLabel("Geometry:")
+                geo_title.setStyleSheet("font-weight: bold; margin-top: 10px; margin-left: -4px;")
+                self.editor_form.addRow(geo_title)
+
+                instep_checkbox = QCheckBox("Instep from Previous Layer")
+                instep_checkbox.setChecked(layer.instep_enabled)
+                self.editor_form.addRow(instep_checkbox)
+
+                # --- Placeholder for inputs + unit selectors ---
+                self._root_input_field = None
+                self._root_unit_box = None
+                self._tip_input_field = None
+                self._tip_unit_box = None
+                self._height_input_field = None
+                self._height_unit_box = None
+                self._sweep_input_field = None
+                self._sweep_unit_box = None
+
+                # --- Geometry update logic ---
+                def update_geometry_fields_from_layer():
+                    from finsolver.units import convert_from_si  # ensure import is available
+                    def set_value(line_edit, combo_box, si_value):
+                        if line_edit and combo_box:
+                            unit = combo_box.currentText()
+                            val = convert_from_si(si_value, unit)
+                            line_edit.setText(f"{val:.4g}")
+
+                    set_value(self._root_input_field, self._root_unit_box, layer.root_chord)
+                    set_value(self._tip_input_field, self._tip_unit_box, layer.tip_chord)
+                    set_value(self._height_input_field, self._height_unit_box, layer.height)
+                    set_value(self._sweep_input_field, self._sweep_unit_box, layer.sweep_length)
+
+                def handle_instep_change():
+                    if layer.instep_enabled:
+                        self.apply_instep_geometry(index)
+                        update_geometry_fields_from_layer()
+                        self.visual_view.update()
+
+                instep_input = self.make_input_with_units(
+                    layer.instep_value,
+                    ["mm", "cm", "in", "m"],
+                    "mm",
+                    lambda val: setattr(layer, "instep_value", val),
+                    on_change_callback=handle_instep_change
+                )
+                self.editor_form.addRow("Instep Distance:", instep_input)
+
+                # --- Geometry Inputs ---
+                def capture_field_refs(widget, input_attr, unit_attr):
+                    setattr(self, input_attr, widget.findChild(QLineEdit))
+                    setattr(self, unit_attr, widget.findChild(QComboBox))
+
+                root_input = self.make_input_with_units(
+                    layer.root_chord, ["mm", "cm", "in", "m"], "mm",
+                    lambda val: setattr(layer, "root_chord", val)
+                )
+                capture_field_refs(root_input, "_root_input_field", "_root_unit_box")
+
+                tip_input = self.make_input_with_units(
+                    layer.tip_chord, ["mm", "cm", "in", "m"], "mm",
+                    lambda val: setattr(layer, "tip_chord", val)
+                )
+                capture_field_refs(tip_input, "_tip_input_field", "_tip_unit_box")
+
+                height_input = self.make_input_with_units(
+                    layer.height, ["mm", "cm", "in", "m"], "mm",
+                    lambda val: setattr(layer, "height", val)
+                )
+                capture_field_refs(height_input, "_height_input_field", "_height_unit_box")
+
+                sweep_input = self.make_input_with_units(
+                    layer.sweep_length, ["mm", "cm", "in", "m"], "mm",
+                    lambda val: setattr(layer, "sweep_length", val)
+                )
+                capture_field_refs(sweep_input, "_sweep_input_field", "_sweep_unit_box")
+
+                geometry_inputs = [root_input, tip_input, height_input, sweep_input]
+
+                def update_instep_state(enabled: bool):
+                    print(f"[DEBUG] Instep checkbox toggled. Enabled: {enabled}")
+                    instep_input.setEnabled(enabled)
+                    for widget in geometry_inputs:
+                        line_edit = widget.findChild(QLineEdit)
+                        unit_box = widget.findChild(QComboBox)
+                        if line_edit:
+                            line_edit.setDisabled(enabled)
+                        if unit_box:
+                            unit_box.setEnabled(True)  # Always allow unit box to change
+
+                    layer.instep_enabled = enabled
+
+                    if enabled:
+                        self.apply_instep_geometry(index)
+                        update_geometry_fields_from_layer()
+
+                    self.visual_view.update()
+
+                update_instep_state(layer.instep_enabled)
+                instep_checkbox.toggled.connect(lambda checked: update_instep_state(checked))
+
+                # Add geometry rows
+                self.editor_form.addRow("Root Chord:", root_input)
+                self.editor_form.addRow("Tip Chord:", tip_input)
+                self.editor_form.addRow("Height:", height_input)
+                self.editor_form.addRow("Sweep Length:", sweep_input)
+
+                # --- Material Section ---
+                mat_title = QLabel("Material Properties:")
+                mat_title.setStyleSheet("font-weight: bold; margin-top: 10px; margin-left: -4px;")
+                self.editor_form.addRow(mat_title)
+
+                self.editor_form.addRow("Density:", self.make_input_with_units(layer.density, ["kg/m³"], "kg/m³", lambda val: setattr(layer, "density", val)))
+                self.editor_form.addRow("Material:", QLineEdit(layer.material))
+                self.editor_form.addRow("Young's Modulus:", self.make_input_with_units(layer.E, ["GPa", "MPa"], "GPa", lambda val: setattr(layer, "E", val)))
+                self.editor_form.addRow("Shear Modulus:", self.make_input_with_units(layer.G, ["GPa", "MPa"], "GPa", lambda val: setattr(layer, "G", val)))
+                self.editor_form.addRow("Poisson's Ratio:", QLineEdit(str(layer.poisson_ratio)))
+
+                self.delete_button.show()
+
+
+
+        else:
+            self.delete_button.hide()
+
+
+        # Set the selected layer index for visual highlighting
+        if name == "Core Layer":
+            self.visual_view.set_selected_layer(0)
+        elif name.startswith("Layer"):
+            index = self.get_layer_index(name)
+            if index is not None:
+                self.visual_view.set_selected_layer(index + 1)  # +1 because core = 0
+        else:
+            self.visual_view.set_selected_layer(-1)  # Deselect all
+
+        self.visual_view.update()
+
+
+    def get_layer_index(self, name):
+        try:
+            return int(name.replace("Layer ", "")) - 1
+        except ValueError:
+            return None
+
+    def add_new_layer(self):
+        self.config.layers.append(FinLayerData())
+        new_item = QListWidgetItem(f"Layer {len(self.config.layers)}")
+        insert_index = self.nav_list.row(self.add_layer_item)
+        self.nav_list.insertItem(insert_index, new_item)
+        self.nav_list.setCurrentItem(new_item)
+
+    def delete_selected_layer(self):
+        current_item = self.nav_list.currentItem()
+        if current_item and current_item.text().startswith("Layer"):
+            index = self.get_layer_index(current_item.text())
+            if index is not None and 0 <= index < len(self.config.layers):
+                del self.config.layers[index]
+                self.nav_list.takeItem(self.nav_list.row(current_item))
+                self.renumber_layers()
+
+                def update_selection():
+                    if self.config.layers:
+                        self.nav_list.setCurrentRow(2 + min(index, len(self.config.layers) - 1))
+                    else:
+                        self.nav_list.setCurrentItem(self.general_item)
+
+                QTimer.singleShot(0, update_selection)
+
+        # Ensure the visual view reflects the updated layer list
+        self.visual_view.set_config(self.config)
+        self.visual_view.set_selected_layer(-1)
+        self.visual_view.update()
+
+
+    def renumber_layers(self):
+        count = 1
+        for i in range(self.nav_list.count()):
+            item = self.nav_list.item(i)
+            if item.text().startswith("Layer"):
+                item.setText(f"Layer {count}")
+                count += 1
+
+    def run_simulation(self):
+        try:
+            result_summary = calculate_flutter(self.config)
+            QMessageBox.information(self, "Flutter Simulation", result_summary)
+        except Exception as e:
+            QMessageBox.critical(self, "Simulation Error", f"An error occurred:\n{str(e)}")
+
+    def apply_instep_geometry(self, layer_index: int):
+        print(f"[DEBUG] apply_instep_geometry called for layer {layer_index}")
+        """Apply geometry from the previous layer with the given instep offset."""
+
+        current_layer = self.config.layers[layer_index]
+
+        if layer_index == 0:
+            prev_layer = self.config.core
+        else:
+            prev_layer = self.config.layers[layer_index - 1]
+
+        offset = current_layer.instep_value
+
+        # Apply offset to geometry (clamping to zero to avoid negatives)
+        current_layer.root_chord = max(prev_layer.root_chord - offset, 0)
+        current_layer.tip_chord = max(prev_layer.tip_chord - offset, 0)
+        current_layer.height = max(prev_layer.height - offset, 0)
+        current_layer.sweep_length = max(prev_layer.sweep_length - offset, 0)
+
+        print(f"[INFO] Instep geometry applied to Layer {layer_index + 1}")
+
+
+
+if __name__ == '__main__':
+    app = QApplication(sys.argv)
+    window = FinSolverMainWindow()
+    window.show()
+    sys.exit(app.exec())
