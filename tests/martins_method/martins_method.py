@@ -35,8 +35,6 @@ def calculate_flutter_velocity(speed_of_sound, shear_modulus, aspect_ratio, fin_
 
     p_0 = 101.325e3 # Pressure at sea level in Pa
 
-
-    
     def calculate_epsilon(tip_chord_length, root_chord_length, sweep_length):
         TC = tip_chord_length
         RC = root_chord_length
@@ -53,10 +51,7 @@ def calculate_flutter_velocity(speed_of_sound, shear_modulus, aspect_ratio, fin_
 
 
     epsilon = calculate_epsilon(tip_chord_length, root_chord_length, sweep_length)
-
     DN = calculate_denominator_constant(epsilon, p_0)
-    print(f"DN: {DN} Pa, {DN * 0.000145038} psi")
-
 
     return speed_of_sound * np.sqrt((shear_modulus) / ((DN * aspect_ratio**3)/((fin_thickness / root_chord_length)**3 * (aspect_ratio + 2)) * (taper_ratio + 1)/(2) * (air_pressure)/(p_0)))
 
