@@ -28,7 +28,7 @@ class FlutterAnalysisMartinsMethod:
             speed_of_sound = self.calculate_speed_of_sound(T)
             air_pressure = self.calculate_air_pressure(T)
 
-            flutter_velocity = self.calculate_flutter_velocity(speed_of_sound, fin.shear_modulus, fin.aspect_ratio, fin.thickness, fin.root_chord_length, fin.taper_ratio, air_pressure, fin.sweep_length, fin.tip_chord_length)
+            flutter_velocity = self.calculate_flutter_velocity(speed_of_sound, fin.shear_modulus, fin.height, fin.thickness, fin.root_chord_length, fin.taper_ratio, air_pressure, fin.sweep_length, fin.tip_chord_length)
 
             results["altitude"][i] = altitude
             results["flutter_velocity"][i] = flutter_velocity
@@ -41,7 +41,7 @@ class FlutterAnalysisMartinsMethod:
 
 
     @staticmethod
-    def calculate_flutter_velocity(speed_of_sound, shear_modulus, aspect_ratio, fin_thickness, root_chord_length, taper_ratio, air_pressure, sweep_length, tip_chord_length):
+    def calculate_flutter_velocity(speed_of_sound, shear_modulus, height, fin_thickness, root_chord_length, taper_ratio, air_pressure, sweep_length, tip_chord_length):
         '''
         Calculate the flutter velocity (v_f) in m/s.
         '''
@@ -61,10 +61,18 @@ class FlutterAnalysisMartinsMethod:
             kappa = 1.4 # adiabatic index for air
             return (24 * epsilon * kappa * p_0)/(np.pi)
         
+        def calculate_aspect_ratio(height, root_chord_length, tip_chord_length):
+            
+            area = ((root_chord_length + tip_chord_length) / 2 ) * height
+            return height**2 / area
+        
 
 
         epsilon = calculate_epsilon(tip_chord_length, root_chord_length, sweep_length)
         DN = calculate_denominator_constant(epsilon, p_0)
+        aspect_ratio = calculate_aspect_ratio(height, root_chord_length, tip_chord_length)
+
+        print(f"aspect_ratio: {aspect_ratio}")
 
         return speed_of_sound * np.sqrt((shear_modulus) / ((DN * aspect_ratio**3)/((fin_thickness / root_chord_length)**3 * (aspect_ratio + 2)) * (taper_ratio + 1)/(2) * (air_pressure)/(p_0)))
 
@@ -139,13 +147,12 @@ class Fin:
 fin = Fin()
 
 fin.shear_modulus = 600000 *6894.76
-fin.aspect_ratio = 0.6
 fin.thickness = 0.125 * 0.0254
 fin.root_chord_length = 7.5 * 0.0254
 fin.taper_ratio = 0.3333
 fin.sweep_length = 4.285 * 0.0254
 fin.tip_chord_length = 2.5 * 0.0254
-
+fin.height = 3 * 0.0254
 
 # Instantiate the class properly
 flutter_analysis = FlutterAnalysisMartinsMethod()
