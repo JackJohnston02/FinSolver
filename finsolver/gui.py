@@ -12,11 +12,13 @@ from time import time
 from finsolver.config import FinConfig, FinLayerData
 from finsolver.units import convert_to_si, convert_from_si
 from finsolver.visual import FinCrossSectionView
-from finsolver.flutter_analysis import calculate_flutter
+from finsolver.flutter_analysis import run_flutter_analysis
 
 from PyQt6.QtWidgets import QFileDialog
 import json
 import os
+
+
 
 
 class FinSolverMainWindow(QMainWindow):
@@ -515,11 +517,15 @@ class FinSolverMainWindow(QMainWindow):
                 count += 1
 
     def run_simulation(self):
-        try:
-            result_summary = calculate_flutter(self.config)
-            QMessageBox.information(self, "Flutter Simulation", result_summary)
-        except Exception as e:
-            QMessageBox.critical(self, "Simulation Error", f"An error occurred:\n{str(e)}")
+        result_summary = run_flutter_analysis(self.config)
+        QMessageBox.information(self, "Flutter Simulation", result_summary)
+    
+        # try:
+        #     result_summary = run_flutter_analysis(self.config)
+        #     QMessageBox.information(self, "Flutter Simulation", result_summary)
+        # except Exception as e:
+        #     QMessageBox.critical(self, "Simulation Error", f"An error occurred:\n{str(e)}")
+            
 
     def apply_instep_geometry(self, layer_index: int):
         print(f"[DEBUG] apply_instep_geometry called for layer {layer_index}")
