@@ -1,6 +1,6 @@
 from finsolver.config import FinConfig
 import numpy as np
-from scipy.integrate import trapz
+from numpy import trapz
 from scipy.linalg import eig
 from scipy.special import kv as besselk
 from pprint import pprint
