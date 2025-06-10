@@ -410,7 +410,14 @@ class FinSolverMainWindow(QMainWindow):
                 )
                 capture_field_refs(sweep_input, "_sweep_input_field", "_sweep_unit_box")
 
-                geometry_inputs = [root_input, tip_input, height_input, sweep_input]
+
+                thickness_input = self.make_input_with_units(
+                    layer.thickness, ["mm", "cm", "in", "m"], "mm",
+                    lambda val: setattr(layer, "thickness", val)
+                )
+                capture_field_refs(thickness_input, "_thickness", "_thickness_unit_box")
+
+                geometry_inputs = [root_input, tip_input, height_input, sweep_input, thickness_input]
 
                 def update_instep_state(enabled: bool):
                     print(f"[DEBUG] Instep checkbox toggled. Enabled: {enabled}")
@@ -439,6 +446,7 @@ class FinSolverMainWindow(QMainWindow):
                 self.editor_form.addRow("Tip Chord:", tip_input)
                 self.editor_form.addRow("Height:", height_input)
                 self.editor_form.addRow("Sweep Length:", sweep_input)
+                self.editor_form.addRow("Thickness:", thickness_input)
 
                 # --- Material Section ---
                 mat_title = QLabel("Material Properties:")
