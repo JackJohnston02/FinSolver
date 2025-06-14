@@ -90,6 +90,7 @@ class Core:
 @dataclass
 class Layer:
     name: str = "Layer"
+    instep_from_previous_layer: bool = False
     geometry: Trapezoid = Trapezoid()
     material: IsotropicMaterial = IsotropicMaterial()
 

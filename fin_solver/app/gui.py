@@ -1,6 +1,7 @@
 import streamlit as st
 from dataclasses import fields, is_dataclass
 from fin_solver.app.models import Config, Parameter, Layer
+from dataclasses import asdict
 
 
 def render_parameter(param: Parameter, key_prefix: str = "") -> None:
@@ -84,32 +85,4 @@ def run_gui():
         st.info("Solver output and plots will be displayed here.")
 
         with st.expander("Show Raw Config Data", expanded=False):
-            st.json({
-                "general": {
-                    f.name: getattr(config.general_parameters, f.name).value
-                    for f in fields(config.general_parameters)
-                },
-                "core": {
-                    "geometry": {
-                        f.name: getattr(config.core.geometry, f.name).value
-                        for f in fields(config.core.geometry)
-                    },
-                    "material": {
-                        f.name: getattr(config.core.material, f.name).value
-                        for f in fields(config.core.material)
-                    }
-                },
-                "layers": [
-                    {
-                        "geometry": {
-                            f.name: getattr(layer.geometry, f.name).value
-                            for f in fields(layer.geometry)
-                        },
-                        "material": {
-                            f.name: getattr(layer.material, f.name).value
-                            for f in fields(layer.material)
-                        }
-                    }
-                    for layer in config.layers
-                ]
-            })
+            st.json(asdict(config))
