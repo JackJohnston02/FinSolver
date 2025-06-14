@@ -22,6 +22,25 @@ class GeneralParameters:
         tooltip="Give this configuration a name for saving/exporting"
     )
 
+    number_of_fins: Parameter = Parameter(
+        name="Number of Fins",
+        value=3,
+        tooltip="How many fins are evenly spaced around the rocket body",
+        min=1,
+        max=12,
+        step=1
+    )
+
+    body_tube_OD: Parameter = Parameter(
+        name="Body Tube Outer Diameter",
+        value=0.1,
+        units="m",
+        tooltip="Outer diameter of the rocket body tube",
+        min=0.01,
+        max=1.0,
+        step=0.005
+    )
+
 
 # ─── Geometry: Trapezoidal Fin ─────────────────────
 @dataclass
