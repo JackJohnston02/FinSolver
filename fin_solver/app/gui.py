@@ -2,6 +2,7 @@ import streamlit as st
 from dataclasses import fields, is_dataclass
 from fin_solver.app.models import Config, Parameter, Layer
 from dataclasses import asdict
+from fin_solver.app.visualisation import create_3d_fin_layup_render
 
 
 def render_parameter(param: Parameter, key_prefix: str = "") -> None:
@@ -106,6 +107,14 @@ def run_gui():
     with col2:
         st.header("Results & Visualisation")
         st.info("Solver output and plots will be displayed here.")
+        
+        st.subheader("3D Fin Layup Preview")
+        fig = create_3d_fin_layup_render(config)
+        if fig:
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.warning("Unable to render fin layup. Check that geometry is valid.")
+
 
         with st.expander("Show Raw Config Data", expanded=False):
             st.json(asdict(config))
