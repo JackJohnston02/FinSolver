@@ -9,13 +9,13 @@ def get_vertices_3d(root, tip, height, thickness, sweep):
     The fin extends radially (Y-axis) and sweep affects the tip's Y-offset.
     """
     # Define 4 midplane vertices of the trapezoid
-    p1 = np.array([0, 0, 0])                      # root bottom
-    p2 = np.array([0, 0, root])                   # root top
-    p3 = np.array([height, 0, root - sweep])      # tip top
-    p4 = np.array([height, 0, root - sweep - tip])# tip bottom
+    p1 = np.array([0, 0, -root/2])                      # root bottom
+    p2 = np.array([0, 0, root/2])                   # root top
+    p3 = np.array([height, 0, root/2 - sweep])      # tip top
+    p4 = np.array([height, 0, root/2 - sweep - tip])# tip bottom
 
     # Offset in the ±X direction for thickness
-    offset = np.array([0, thickness / 2, -root/2])
+    offset = np.array([0, thickness / 2, 0])
 
     # Compute front and back face vertices
     bottom = [p1 - offset, p2 - offset, p3 - offset, p4 - offset]
@@ -45,8 +45,8 @@ def create_body_tube_mesh(radius, height, segments=30):
     theta = np.linspace(0, 2 * np.pi, segments)
     x = radius * np.cos(theta)
     y = radius * np.sin(theta)
-    z_bottom = np.zeros(segments)
-    z_top = np.full(segments, height)
+    z_bottom = np.zeros(segments) - np.ones(segments) * height/2
+    z_top = np.full(segments, height/2)
 
     # Combine bottom and top
     x_all = np.concatenate([x, x])

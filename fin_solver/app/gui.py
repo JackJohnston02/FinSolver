@@ -69,6 +69,11 @@ def run_gui():
 
         if st.button("➕ Add Layer"):
             config.layers.append(Layer(name=f"Layer {len(config.layers) + 1}"))
+            st.rerun()
+
+
+        # Track layers to delete
+        layers_to_delete = []
 
         for i, layer in enumerate(config.layers):
             with st.expander(f"Layer {i + 1}: {layer.name}"):
@@ -81,22 +86,29 @@ def run_gui():
                 )
 
                 if layer.instep_from_previous_layer:
-                    # Always render instep distance
                     render_parameter(layer.instep_distance, key_prefix=f"layer{i}_instep_dist")
-
-                    # Determine base geometry
                     base_geom = config.core.geometry if i == 0 else config.layers[i - 1].geometry
                     layer.apply_instep(base_geom)
-
-                    # Only render editable thickness
                     thickness_param = layer.geometry.thickness
-                    thickness_param.name = "Thickness"  # Optional UI tweak
+                    thickness_param.name = "Thickness"
                     render_parameter(thickness_param, key_prefix=f"layer{i}_thickness")
-
                 else:
                     render_object_fields(layer.geometry, key_prefix=f"layer{i}_geom")
 
                 render_object_fields(layer.material, key_prefix=f"layer{i}_mat")
+
+                # 🔻 Delete button now placed at the bottom
+                st.markdown("---")
+                if st.button(f"🗑️ Delete Layer {i + 1}", key=f"delete_layer_{i}"):
+                    layers_to_delete.append(i)
+
+        # Apply deletions after the loop
+        for idx in sorted(layers_to_delete, reverse=True):
+            del config.layers[idx]
+            st.rerun()
+
+
+
 
 
 
