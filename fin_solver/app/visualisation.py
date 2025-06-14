@@ -15,7 +15,7 @@ def get_vertices_3d(root, tip, height, thickness, sweep):
     p4 = np.array([height, 0, root - sweep - tip])# tip bottom
 
     # Offset in the ±X direction for thickness
-    offset = np.array([0, thickness / 2, 0])
+    offset = np.array([0, thickness / 2, -root/2])
 
     # Compute front and back face vertices
     bottom = [p1 - offset, p2 - offset, p3 - offset, p4 - offset]
@@ -105,15 +105,22 @@ def create_3d_fin_layup_render(config: Config):
     # ─── Render Layers ───────────────────────────
     for idx, layer in enumerate(config.layers):
         geom = layer.geometry
+
+        # TODO We need to offset the layer due to the previous layers and also mirror it as the layup is on both sides, could just add the thickness!?!
+        additional_thickness = 0
+        for idx_minor, layer_minor in enumerate(config.layers):
+            if idx_minor < idx:
+                additional_thickness += layer_minor.geometry.thickness
+
+
         verts = get_vertices_3d(
             root=geom.root_chord.value,
             tip=geom.tip_chord.value,
             height=geom.height.value,
-            thickness=geom.thickness.value,
+            thickness=geom.thickness.value + additional_thickness,
             sweep=geom.sweep_length.value
         )
 
-        # TODO We need to offset the layer due to the previous layers and also mirror it as the layup is on both sides
 
         for i in range(num_fins):
             angle = 2 * np.pi * i / num_fins
