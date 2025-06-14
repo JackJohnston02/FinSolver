@@ -70,14 +70,37 @@ def run_gui():
             config.layers.append(Layer(name=f"Layer {len(config.layers) + 1}"))
 
         for i, layer in enumerate(config.layers):
-            with st.expander(f"Layer {i + 1}", expanded=True):
-                render_object_fields(layer.geometry, key_prefix=f"layer{i}_geom")
+            with st.expander(f"Layer {i + 1}: {layer.name}"):
+                # Instep checkbox
+                layer.instep_from_previous_layer = st.checkbox(
+                    "Instep from previous layer",
+                    value=layer.instep_from_previous_layer,
+                    help="Enable this to shift this layer inward from the one below.",
+                    key=f"layer{i}_instep"
+                )
+
+                if layer.instep_from_previous_layer:
+                    # Always render instep distance
+                    render_parameter(layer.instep_distance, key_prefix=f"layer{i}_instep_dist")
+
+                    # Determine base geometry
+                    base_geom = config.core.geometry if i == 0 else config.layers[i - 1].geometry
+                    layer.apply_instep(base_geom)
+
+                    # Only render editable thickness
+                    thickness_param = layer.geometry.thickness
+                    thickness_param.name = "Thickness"  # Optional UI tweak
+                    render_parameter(thickness_param, key_prefix=f"layer{i}_thickness")
+
+                else:
+                    render_object_fields(layer.geometry, key_prefix=f"layer{i}_geom")
+
                 render_object_fields(layer.material, key_prefix=f"layer{i}_mat")
 
-                if st.button(f"🗑️ Remove Layer {i + 1}", key=f"remove_layer_{i}"):
-                    config.layers.pop(i)
-                    st.rerun()
-                    break
+
+
+
+
 
     # ─── RIGHT COLUMN: Output ─────────────────────────────────────────
     with col2:
