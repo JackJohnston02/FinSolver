@@ -44,10 +44,17 @@ def run_gui():
 
     config: Config = st.session_state.config
 
-    st.title("Fin Flutter Configuration Tool")
+    st.set_page_config(
+        page_title="FinSolver 1.0",   # Title of the browser tab
+        page_icon="fin_solver/app/assets/icon_finsolver.png",                         # Can be an emoji or a URL to an image
+        layout="centered",                          # Optional: 'centered' or 'wide'
+        initial_sidebar_state="expanded",       # Optional: 'auto', 'expanded', 'collapsed'
+        )
+
+    st.title("Fin Flutter Analysis Tool")
 
     # Layout
-    col1, col2 = st.columns([1.2, 2])
+    col1, spacer, col2 = st.columns([1.2, 0.3, 2])
 
     # ─── LEFT COLUMN: Input ──────────────────────────────────────────
     with col1:
